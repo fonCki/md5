@@ -6,8 +6,6 @@ Minimal, language-agnostic skeleton for our Applied Crypto project.
 
 Each technique lives in its own folder and exposes a tiny CLI (run.sh). The top-level Makefile runs all techniques and a verifier.
 
-> TL;DR: each technique’s run.sh must write two files t1.bin and t2.bin plus a manifest.json into its out/ folder. Then make verify recomputes hashes and prints a small table.
-
 ---
 
 ## Why a manifest.json if filenames are constant?
