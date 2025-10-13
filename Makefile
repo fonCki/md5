@@ -1,18 +1,30 @@
-.PHONY: all ip cpc reusable verify clean
 
-all: ip cpc reusable
+SHELL := /bin/bash
 
-ip:
-	@techniques/identical-prefix/run.sh --out-dir techniques/identical-prefix/out
+.PHONY: all verify clean list
 
-cpc:
-	@techniques/chosen-prefix/run.sh --out-dir techniques/chosen-prefix/out
+# Find run.sh at depth 2 or 3: techniques/<name>/run.sh and techniques/<name>/<sub>/run.sh
+RUNNERS := $(shell find techniques -mindepth 2 -maxdepth 3 -type f -name run.sh | sort)
 
-reusable:
-	@techniques/reusable-format/run.sh --out-dir techniques/reusable-format/out
+all:
+	@set -e; \
+	if [[ -z "$(RUNNERS)" ]]; then \
+	  echo "No techniques found (no run.sh under techniques/*)."; exit 1; \
+	fi; \
+	for r in $(RUNNERS); do \
+	  d="$$(dirname "$$r")"; \
+	  echo ""; \
+	  echo "==> $$r --out-dir $$d/out"; \
+	  "$$r" --out-dir "$$d/out"; \
+	done
+
+list:
+	@printf "Discovered run.sh files:\n"; \
+	for r in $(RUNNERS); do echo "  $$r"; done
 
 verify:
-	@python3 tools/verify_all.py techniques/*/out/manifest.json || true
+	@echo ""; echo "==> Verifying"; \
+	python3 tools/verify_all.py techniques/*/out/manifest.json techniques/*/*/out/manifest.json || true
 
 clean:
-	@./scripts/clean.sh
+	@bash scripts/clean.sh
