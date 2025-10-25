@@ -189,4 +189,3 @@ JSON
 cat "${MANIFEST}"
 echo
 echo "Done. Outputs in: ${OUT}"
-
