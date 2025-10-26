@@ -1,19 +1,105 @@
-if ! command -v openssl &> /dev/null
-then
-    echo "OpenSSL could not be found. Please install OpenSSL to proceed."
-    exit 1
-fi
+#!/usr/bin/env bash
+set -euo pipefail
 
-# 1) Make one RSA private key (reused for both certs)
-openssl genrsa -out key.pem 4096
+: "${HASHCLASH_DIR:=$HOME/src/hashclash}"
+: "${WORKLEVEL:=2}"
+: "${NTHREADS:=$(command -v nproc >/dev/null 2>&1 && nproc || echo 1)}"
+: "${WORKDIR:=$PWD/../../out/CA_Experiment}"
+
+: "${MD5_CPC_BIN:=${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisions/cpc_md5}"
+MD5_CPC_BIN="${MD5_CPC_BIN:-${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisions/cpc_md5}"
+
+mkdir -p "${WORKDIR}"
+
+# Check prereqs
+command -v openssl >/dev/null 2>&1 || { echo "OpenSSL not found"; exit 1; }
+command -v git >/dev/null 2>&1 || { echo "git not found"; exit 1; }
+
+# 1) One RSA key (reused)
+openssl genrsa -out "${WORKDIR}/key.pem" 4096
 
 # 2) Create cert A (self-signed) with subject A
-openssl req -new -x509 -key key.pem -out certA.pem -days 3650 -sha256 \
+openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certA.pem" -days 3650 -sha256 \
   -subj "/CN=ACruelAttacker.com/O=Example Org/C=DK" \
   -set_serial 1
 
-# 3) Create cert B (self-signed) with subject B (same key!)
-openssl req -new -x509 -key key.pem -out certB.pem -days 3650 -sha256 \
+# 3) Create cert B (self-signed) with subject B (same key)
+openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certB.pem" -days 3650 -sha256 \
   -subj "/CN=dtu.dk/O=Technical University of Denmark/C=DK" \
   -set_serial 2
 
+# Convert to DER at the exact paths we’ll pass to cpc_md5
+PREFIX_A="${WORKDIR}/certA.der"
+PREFIX_B="${WORKDIR}/certB.der"
+openssl x509 -in "${WORKDIR}/certA.pem" -outform DER -out "${PREFIX_A}"
+openssl x509 -in "${WORKDIR}/certB.pem" -outform DER -out "${PREFIX_B}"
+
+# 4) Ensure HashClash is present/built
+if [[ ! -d "${HASHCLASH_DIR}" ]]; then
+  echo "Cloning HashClash into ${HASHCLASH_DIR}..."
+  git clone https://github.com/cr-marcstevens/hashclash "${HASHCLASH_DIR}"
+else
+  echo "Using existing HashClash at ${HASHCLASH_DIR}"
+fi
+
+if [[ ! -f "${HASHCLASH_DIR}/build.sh" ]]; then
+  echo "ERROR: build.sh not found in ${HASHCLASH_DIR}" >&2
+  exit 1
+fi
+
+# Build if cpc binary isn’t present and md5fastcoll isn’t built yet
+if [ ! -x "${MD5_CPC_BIN}" ] && [ ! -x "${HASHCLASH_DIR}/src/md5fastcoll" ]; then
+  echo "Building HashClash (./build.sh)…"
+  (cd "${HASHCLASH_DIR}" && ./build.sh)
+fi
+
+# 5) Run chosen-prefix collision to produce per-file suffixes
+SA="${WORKDIR}/sufA.bin"
+SB="${WORKDIR}/sufB.bin"
+
+if [[ -x "${MD5_CPC_BIN}" ]]; then
+  "${MD5_CPC_BIN}" \
+    --prefixfile1 "${PREFIX_A}" --prefixfile2 "${PREFIX_B}" \
+    --out1 "${SA}" --out2 "${SB}" \
+    --threads "${NTHREADS}" \
+    --worklevel "${WORKLEVEL}"
+else
+  # Fallback to repo script
+  workdir="${HASHCLASH_DIR}/cpc_workdir"
+  mkdir -p "${workdir}"
+  cp -f "${PREFIX_A}" "${PREFIX_B}" "${workdir}/"
+  (
+    cd "${workdir}"
+    ../scripts/cpc.sh "$(basename "${PREFIX_A}")" "$(basename "${PREFIX_B}")"
+  )
+  # Collect outputs (standard names or newest two files)
+  if [ -f "${workdir}/collision1.bin" ] && [ -f "${workdir}/collision2.bin" ]; then
+    cp -f "${workdir}/collision1.bin" "${SA}"
+    cp -f "${workdir}/collision2.bin" "${SB}"
+  else
+    mapfile -t newest < <(ls -t "${workdir}"/* 2>/dev/null | head -n 2)
+    [[ ${#newest[@]} -eq 2 ]] || { echo "ERROR: Could not locate collision outputs in ${workdir}"; exit 1; }
+    cp -f "${newest[0]}" "${SA}"
+    cp -f "${newest[1]}" "${SB}"
+  fi
+fi
+
+# 6) Create final collided binaries (NOT valid DER/PEM certificates)
+OUT_A="${WORKDIR}/certA_final.bin"
+OUT_B="${WORKDIR}/certB_final.bin"
+cat "${PREFIX_A}" "${SA}" > "${OUT_A}"
+cat "${PREFIX_B}" "${SB}" > "${OUT_B}"
+
+# 7) Show resulting hashes
+echo "Threads used: ${NTHREADS}; worklevel: ${WORKLEVEL}"
+echo "Final A MD5:     $(md5sum "${OUT_A}" | cut -d' ' -f1)"
+echo "Final B MD5:     $(md5sum "${OUT_B}" | cut -d' ' -f1)"
+echo "Final A SHA256:  $(sha256sum "${OUT_A}" | cut -d' ' -f1)"
+echo "Final B SHA256:  $(sha256sum "${OUT_B}" | cut -d' ' -f1)"
+
+if [[ "$(md5sum "${OUT_A}" | cut -d' ' -f1)" == "$(md5sum "${OUT_B}" | cut -d' ' -f1)" ]]; then
+  echo "Success: MD5(outA) == MD5(outB)"
+else
+  echo "Failure: MD5(outA) != MD5(outB)" >&2
+  exit 2
+fi
