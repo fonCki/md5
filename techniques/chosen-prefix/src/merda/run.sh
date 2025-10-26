@@ -34,8 +34,8 @@ MD5_CPC_BIN="${MD5_CPC_BIN:-${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisio
 NTHREADS="${NTHREADS:-$(nproc 2>/dev/null || echo 1)}"
 
 # Helper scripts
-PAD_SCRIPT="${SCRIPTS_DIR}/pad_to_block.py"
-PDF_WRAP="${SCRIPTS_DIR}/pdf_wrap.py"
+PAD_SCRIPT="pad_to_block.py"
+PDF_WRAP="pdf_wrap.py"
 
 # Artifacts under OUT
 PREFIX_A="$OUT/prefixA.bin"
