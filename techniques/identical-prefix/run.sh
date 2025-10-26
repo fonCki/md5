@@ -37,8 +37,15 @@ if [[ ! -f "${HCDIR}/build.sh" ]]; then
   echo "ERROR: build.sh not found in ${HCDIR}. Aborting." >&2
   exit 1
 fi
-echo "Running build.sh in ${HCDIR}..."
-( cd "${HCDIR}" && ./build.sh )
+
+MD5_FASTCOLL_BIN="${HCDIR}/src/md5fastcoll"
+
+# Build if md5fastcoll isn't compiled yet
+if [[ ! -x "${MD5_FASTCOLL_BIN}" ]]; then
+  echo "Building HashClash (./build.sh)…"
+  (cd "${HCDIR}" && ./build.sh)
+fi
+
 
 # 3) Prepare workdir and prefix files
 mkdir -p "${WORKDIR}"
@@ -138,5 +145,3 @@ sha256sum "${FINAL_A}" "${FINAL_B}" || true
 echo
 echo "Done. Workdir: ${WORKDIR}"
 echo "If sums differ, inspect the ipc output logs in ${WORKDIR}. If HashClash helper failed, ensure HashClash build completed successfully and rerun."
-
-rm -f "${TMP_PREFIX_PATH}"
