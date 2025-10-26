@@ -133,6 +133,8 @@ FINAL_B="${WORKDIR}/fileB.bin"
 cat "${WORKDIR}/${PREFIX_FILENAME}" "${COL_A}" "${COMMON_TAIL}" > "${FINAL_A}"
 cat "${WORKDIR}/${PREFIX_FILENAME}" "${COL_B}" "${COMMON_TAIL}" > "${FINAL_B}"
 
+echo "Experiment 1: Identical Prefix on short ASCII text"
+
 echo "Assembled final files:"
 ls -l "${FINAL_A}" "${FINAL_B}"
 
