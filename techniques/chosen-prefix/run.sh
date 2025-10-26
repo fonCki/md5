@@ -9,10 +9,6 @@ set -euo pipefail
 
 IFS=$'\n\t'
 
-# merged, working chosen-prefix runner
-# - CLI: --out-dir
-# - Produces: t1.bin, t2.bin, manifest.json in OUT
-# - Prints manifest to stdout
 
 #######################
 # Parse args
