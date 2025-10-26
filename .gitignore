@@ -1,2 +1,6 @@
 # IntelliJ IDEA project files
 .idea/
+
+# Ignore all out directories recursively, but keep their .gitkeep files
+**/out/**
+!**/out/.gitkeep
