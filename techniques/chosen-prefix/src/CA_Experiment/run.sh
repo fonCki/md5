@@ -5,15 +5,13 @@ set -euo pipefail
 : "${WORKLEVEL:=2}"
 : "${NTHREADS:=$(command -v nproc >/dev/null 2>&1 && nproc || echo 1)}"
 : "${WORKDIR:=$PWD/../../out/CA_Experiment}"
-
 : "${MD5_CPC_BIN:=${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisions/cpc_md5}"
-MD5_CPC_BIN="${MD5_CPC_BIN:-${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisions/cpc_md5}"
 
 mkdir -p "${WORKDIR}"
 
 # Check prereqs
 command -v openssl >/dev/null 2>&1 || { echo "OpenSSL not found"; exit 1; }
-command -v git >/dev/null 2>&1 || { echo "git not found"; exit 1; }
+command -v git     >/dev/null 2>&1 || { echo "git not found"; exit 1; }
 
 # 1) One RSA key (reused)
 openssl genrsa -out "${WORKDIR}/key.pem" 4096
@@ -47,8 +45,8 @@ if [[ ! -f "${HASHCLASH_DIR}/build.sh" ]]; then
   exit 1
 fi
 
-# Build if cpc binary isn’t present and md5fastcoll isn’t built yet
-if [ ! -x "${MD5_CPC_BIN}" ] && [ ! -x "${HASHCLASH_DIR}/src/md5fastcoll" ]; then
+# Build if neither CPC nor md5_fastcoll exist yet
+if [[ ! -x "${MD5_CPC_BIN}" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" ]]; then
   echo "Building HashClash (./build.sh)…"
   (cd "${HASHCLASH_DIR}" && ./build.sh)
 fi
@@ -64,23 +62,33 @@ if [[ -x "${MD5_CPC_BIN}" ]]; then
     --threads "${NTHREADS}" \
     --worklevel "${WORKLEVEL}"
 else
-  # Fallback to repo script
-  workdir="${HASHCLASH_DIR}/cpc_workdir"
-  mkdir -p "${workdir}"
-  cp -f "${PREFIX_A}" "${PREFIX_B}" "${workdir}/"
+  # Fallback to repo script — isolate per run; clean up on exit
+  workdir="$(mktemp -d "${HASHCLASH_DIR}/cpc_workdir.XXXXXX")"
+  trap 'rm -rf -- "$workdir"' EXIT
+
+  cp -f -- "${PREFIX_A}" "${PREFIX_B}" "${workdir}/"
+  start_ts=$(date +%s)
+
   (
     cd "${workdir}"
-    ../scripts/cpc.sh "$(basename "${PREFIX_A}")" "$(basename "${PREFIX_B}")"
+    WORKLEVEL="${WORKLEVEL}" THREADS="${NTHREADS}" ../scripts/cpc.sh \
+      "$(basename "${PREFIX_A}")" "$(basename "${PREFIX_B}")"
   )
-  # Collect outputs (standard names or newest two files)
-  if [ -f "${workdir}/collision1.bin" ] && [ -f "${workdir}/collision2.bin" ]; then
-    cp -f "${workdir}/collision1.bin" "${SA}"
-    cp -f "${workdir}/collision2.bin" "${SB}"
+
+  if [[ -s "${workdir}/collision1.bin" && -s "${workdir}/collision2.bin" ]]; then
+    cp -f -- "${workdir}/collision1.bin" "${SA}"
+    cp -f -- "${workdir}/collision2.bin" "${SB}"
   else
-    mapfile -t newest < <(ls -t "${workdir}"/* 2>/dev/null | head -n 2)
+    mapfile -t newest < <(
+      find "${workdir}" -type f -size +0c \
+        ! -name "$(basename "${PREFIX_A}")" \
+        ! -name "$(basename "${PREFIX_B}")" \
+        -newermt "@${start_ts}" \
+        -printf '%T@ %p\n' | sort -nr | awk 'NR<=2{print $2}'
+    )
     [[ ${#newest[@]} -eq 2 ]] || { echo "ERROR: Could not locate collision outputs in ${workdir}"; exit 1; }
-    cp -f "${newest[0]}" "${SA}"
-    cp -f "${newest[1]}" "${SB}"
+    cp -f -- "${newest[0]}" "${SA}"
+    cp -f -- "${newest[1]}" "${SB}"
   fi
 fi
 
@@ -92,12 +100,17 @@ cat "${PREFIX_B}" "${SB}" > "${OUT_B}"
 
 # 7) Show resulting hashes
 echo "Threads used: ${NTHREADS}; worklevel: ${WORKLEVEL}"
-echo "Final A MD5:     $(md5sum "${OUT_A}" | cut -d' ' -f1)"
-echo "Final B MD5:     $(md5sum "${OUT_B}" | cut -d' ' -f1)"
-echo "Final A SHA256:  $(sha256sum "${OUT_A}" | cut -d' ' -f1)"
-echo "Final B SHA256:  $(sha256sum "${OUT_B}" | cut -d' ' -f1)"
+MD5_A=$(md5sum "${OUT_A}" | cut -d' ' -f1)
+MD5_B=$(md5sum "${OUT_B}" | cut -d' ' -f1)
+SHA_A=$(sha256sum "${OUT_A}" | cut -d' ' -f1)
+SHA_B=$(sha256sum "${OUT_B}" | cut -d' ' -f1)
 
-if [[ "$(md5sum "${OUT_A}" | cut -d' ' -f1)" == "$(md5sum "${OUT_B}" | cut -d' ' -f1)" ]]; then
+echo "Final A MD5:     ${MD5_A}"
+echo "Final B MD5:     ${MD5_B}"
+echo "Final A SHA256:  ${SHA_A}"
+echo "Final B SHA256:  ${SHA_B}"
+
+if [[ "${MD5_A}" == "${MD5_B}" ]]; then
   echo "Success: MD5(outA) == MD5(outB)"
 else
   echo "Failure: MD5(outA) != MD5(outB)" >&2
