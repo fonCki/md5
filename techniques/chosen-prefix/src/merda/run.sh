@@ -156,6 +156,9 @@ echo
 echo "SHA256 sums:"
 sha256sum "${PDF1}" "${PDF2}" || true
 
+cp "${PDF1}" "${OUT}/preview_collision1.bin"
+cp "${PDF2}" "${OUT}/preview_collision2.bin"
+
 ########################
 # 7) Expose standardized artifacts and manifest
 ########################
