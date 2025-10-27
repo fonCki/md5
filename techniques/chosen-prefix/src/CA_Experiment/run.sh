@@ -46,9 +46,11 @@ if [[ ! -f "${HASHCLASH_DIR}/build.sh" ]]; then
 fi
 
 # Build if neither CPC nor md5_fastcoll exist yet
-if [[ ! -x "${MD5_CPC_BIN}" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" ]]; then
-  echo "Building HashClash (./build.sh)…"
+if [[ ! -x "${MD5_CPC_BIN}" && ! -x "${HASHCLASH_DIR}/bin/md5_fastcoll" ]]; then
+  echo "Building HashClash (./build.sh)..."
   (cd "${HASHCLASH_DIR}" && ./build.sh)
+else
+  echo "HashClash appears to be built."
 fi
 
 # 5) Run chosen-prefix collision to produce per-file suffixes
@@ -63,32 +65,22 @@ if [[ -x "${MD5_CPC_BIN}" ]]; then
     --worklevel "${WORKLEVEL}"
 else
   # Fallback to repo script — isolate per run; clean up on exit
-  workdir="$(mktemp -d "${HASHCLASH_DIR}/cpc_workdir.XXXXXX")"
-  trap 'rm -rf -- "$workdir"' EXIT
+  hashclash_workdir="$(mktemp -d "${HASHCLASH_DIR}/cpc_workdir.XXXXXX")"
+  # trap 'echo "Cleaning up temp dir ${workdir}"; rm -rf -- "$workdir"' EXIT
 
-  cp -f -- "${PREFIX_A}" "${PREFIX_B}" "${workdir}/"
-  start_ts=$(date +%s)
+  cp -f -- "${PREFIX_A}" "${PREFIX_B}" "${hashclash_workdir}/"
 
   (
-    cd "${workdir}"
-    WORKLEVEL="${WORKLEVEL}" THREADS="${NTHREADS}" ../scripts/cpc.sh \
-      "$(basename "${PREFIX_A}")" "$(basename "${PREFIX_B}")"
+    cd "${hashclash_workdir}"
+    ../scripts/cpc.sh "${PREFIX_A}" "${PREFIX_B}" || true
   )
 
-  if [[ -s "${workdir}/collision1.bin" && -s "${workdir}/collision2.bin" ]]; then
-    cp -f -- "${workdir}/collision1.bin" "${SA}"
-    cp -f -- "${workdir}/collision2.bin" "${SB}"
+  if [[ -s "${PREFIX_A}.coll" && -s "${PREFIX_B}.coll" ]]; then
+    mv "${PREFIX_A}.coll" "${SA}"
+    mv "${PREFIX_B}.coll" "${SB}"
   else
-    mapfile -t newest < <(
-      find "${workdir}" -type f -size +0c \
-        ! -name "$(basename "${PREFIX_A}")" \
-        ! -name "$(basename "${PREFIX_B}")" \
-        -newermt "@${start_ts}" \
-        -printf '%T@ %p\n' | sort -nr | awk 'NR<=2{print $2}'
-    )
-    [[ ${#newest[@]} -eq 2 ]] || { echo "ERROR: Could not locate collision outputs in ${workdir}"; exit 1; }
-    cp -f -- "${newest[0]}" "${SA}"
-    cp -f -- "${newest[1]}" "${SB}"
+    echo "ERROR: Collisions not found, check ${hashclash_workdir} logs." >&2
+    exit 1
   fi
 fi
 
@@ -99,7 +91,9 @@ cat "${PREFIX_A}" "${SA}" > "${OUT_A}"
 cat "${PREFIX_B}" "${SB}" > "${OUT_B}"
 
 # 7) Show resulting hashes
-echo "Threads used: ${NTHREADS}; worklevel: ${WORKLEVEL}"
+echo "----------------------------------------"
+echo "Collision generation complete."
+
 MD5_A=$(md5sum "${OUT_A}" | cut -d' ' -f1)
 MD5_B=$(md5sum "${OUT_B}" | cut -d' ' -f1)
 SHA_A=$(sha256sum "${OUT_A}" | cut -d' ' -f1)
@@ -109,9 +103,16 @@ echo "Final A MD5:     ${MD5_A}"
 echo "Final B MD5:     ${MD5_B}"
 echo "Final A SHA256:  ${SHA_A}"
 echo "Final B SHA256:  ${SHA_B}"
+echo "----------------------------------------"
 
 if [[ "${MD5_A}" == "${MD5_B}" ]]; then
   echo "Success: MD5(outA) == MD5(outB)"
+  if [[ "${SHA_A}" != "${SHA_B}" ]]; then
+    echo "Success: SHA256(outA) != SHA256(outB)"
+  else
+    echo "Failure: SHA256(outA) == SHA256(outB)" >&2
+    exit 3
+  fi
 else
   echo "Failure: MD5(outA) != MD5(outB)" >&2
   exit 2
