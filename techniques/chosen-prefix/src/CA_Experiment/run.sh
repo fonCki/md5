@@ -17,20 +17,19 @@ command -v git     >/dev/null 2>&1 || { echo "git not found"; exit 1; }
 openssl genrsa -out "${WORKDIR}/key.pem" 4096
 
 # 2) Create cert A (self-signed) with subject A
-openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certA.pem" -days 3650 -sha256 \
+openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certA.der" -days 3650 -sha256 \
   -subj "/CN=ACruelAttacker.com/O=Example Org/C=DK" \
-  -set_serial 1
+  -set_serial 1 \
+  -outform DER
 
 # 3) Create cert B (self-signed) with subject B (same key)
-openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certB.pem" -days 3650 -sha256 \
+openssl req -new -x509 -key "${WORKDIR}/key.pem" -out "${WORKDIR}/certB.der" -days 3650 -sha256 \
   -subj "/CN=dtu.dk/O=Technical University of Denmark/C=DK" \
-  -set_serial 2
+  -set_serial 2 \
+  -outform DER
 
-# Convert to DER at the exact paths we’ll pass to cpc_md5
 PREFIX_A="${WORKDIR}/certA.der"
 PREFIX_B="${WORKDIR}/certB.der"
-openssl x509 -in "${WORKDIR}/certA.pem" -outform DER -out "${PREFIX_A}"
-openssl x509 -in "${WORKDIR}/certB.pem" -outform DER -out "${PREFIX_B}"
 
 # 4) Ensure HashClash is present/built
 if [[ ! -d "${HASHCLASH_DIR}" ]]; then
@@ -84,7 +83,7 @@ else
   fi
 fi
 
-# 6) Create final collided binaries (NOT valid DER/PEM certificates)
+# 6) Create final collided binaries (NOT valid DER/PEM certificates) todo: non sono sicuro di questa cosa, SA non dovrebbe già essere unito?
 OUT_A="${WORKDIR}/certA_final.bin"
 OUT_B="${WORKDIR}/certB_final.bin"
 cat "${PREFIX_A}" "${SA}" > "${OUT_A}"
