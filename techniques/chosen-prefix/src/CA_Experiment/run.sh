@@ -4,7 +4,7 @@ set -euo pipefail
 : "${HASHCLASH_DIR:=$HOME/src/hashclash}"
 : "${WORKLEVEL:=2}"
 : "${NTHREADS:=$(command -v nproc >/dev/null 2>&1 && nproc || echo 1)}"
-: "${WORKDIR:=$PWD/../../out/CA_Experiment_2}"
+: "${WORKDIR:=$PWD/../../out/CA_Experiment}"
 : "${MD5_CPC_BIN:=${HASHCLASH_DIR}/projects/md5_chosen_prefix_collisions/cpc_md5}"
 
 read -r -p "Do you want a dry run? [Y/n] " response
@@ -57,12 +57,12 @@ generate_new_input() {
   #  One RSA key (reused)
   openssl genrsa -out "${WORKDIR}/key.pem" 4096
 
-  #  Richiesta di A non firmata
+  #  Request from A - UNSIGNED!
   openssl req -new -key "${WORKDIR}/key.pem" -out "${WORKDIR}/requestA_og.der" \
     -subj "/CN=ACruelAttacker.com/O=Example Org/C=DK" \
     -outform DER
 
-  #  Richiesta di B non firmata
+  #  Request from B - UNSIGNED!
   openssl req -new -key "${WORKDIR}/key.pem" -out "${WORKDIR}/requestB_og.der" \
     -subj "/CN=dtu.dk/O=Technical University of Denmark/C=DK" \
     -set_serial 2 \
@@ -77,9 +77,7 @@ hashclash() {
       --threads "${NTHREADS}" \
       --worklevel "${WORKLEVEL}"
   else
-    # Fallback to repo script — isolate per run; clean up on exit
     hashclash_workdir="$(mktemp -d "${HASHCLASH_DIR}/cpc_workdir.XXXXXX")"
-    # trap 'echo "Cleaning up temp dir ${workdir}"; rm -rf -- "$workdir"' EXIT
 
     cp -f -- "${PREFIX_A}" "${PREFIX_B}" "${hashclash_workdir}/"
 
@@ -110,7 +108,7 @@ fi
 echo "----------------------------------------"
 echo "Collision generation complete."
 
-MD5_A=$(md5sum "${SA}" | cut -d' ' -f1)  # UNBOUND VARIABLE! OUT_A not defined
+MD5_A=$(md5sum "${SA}" | cut -d' ' -f1)
 MD5_B=$(md5sum "${SB}" | cut -d' ' -f1)
 SHA_A=$(sha256sum "${SA}" | cut -d' ' -f1)
 SHA_B=$(sha256sum "${SB}" | cut -d' ' -f1)
@@ -124,6 +122,7 @@ echo "----------------------------------------"
 echo "Now I have two different requests with the same MD5 Hash."
 echo "Theoretically a CA could sign the benign one (A) and the signature would also be valid for the malicious one (B)."
 echo "However, openssl ignores what is after the end of file and thus invalidates our attack. Only a naive CA could be tricked this way."
+
 
 openssl req -text -in "${SA}" -inform DER
 openssl req -text -in "${SB}" -inform DER
