@@ -13,6 +13,8 @@ analysis:
 	@ln -sf techniques/reusable-format/gzip/out/collision1.tar.gz techniques/reusable-format/gzip/out/collision1.gz
 	@ln -sf techniques/reusable-format/gzip/out/collision2.tar.gz techniques/reusable-format/gzip/out/collision2.gz
 	@bash techniques/reusable-format/gzip/analysis/run_analysis.sh
+	@echo ""; echo "==> Running identical-prefix analysis"
+	@bash techniques/identical-prefix/analysis/run_analysis.sh
 
 # Find run.sh at depth 2 or 3: techniques/<name>/run.sh and techniques/<name>/<sub>/run.sh
 RUNNERS := $(shell find techniques -mindepth 2 -maxdepth 3 -type f -name run.sh | sort)
