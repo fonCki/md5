@@ -1,3 +1,5 @@
+# Author: Alfonso Pedro Ridao (s243942)
+# 02232 Applied Cryptography - Fall 2025
 import hashlib,pathlib
 
 def file_hash(path, algo="md5"):

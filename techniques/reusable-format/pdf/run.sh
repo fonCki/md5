@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 # reusable format collision demo for PDF
 # produces collision1.pdf, collision2.pdf, manifest.json
 

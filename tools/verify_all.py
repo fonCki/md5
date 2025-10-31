@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Author: Alfonso Pedro Ridao (s243942)
+# 02232 Applied Cryptography - Fall 2025
 import sys
 import json, pathlib
 import hashlib,argparse

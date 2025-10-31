@@ -1,3 +1,6 @@
+# Author: Alfonso Pedro Ridao (s243942)
+# 02232 Applied Cryptography - Fall 2025
+
 SHELL:=/bin/bash
 
 .PHONY: default ubuntu-first-run deps-ubuntu all list run analysis verify clean help

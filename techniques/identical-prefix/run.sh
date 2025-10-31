@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 # Identical-Prefix MD5 collision
 
 # Flow:

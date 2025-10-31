@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 set -euo pipefail
 
 FMT="${1:-}"; OUT="${2:-}"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 set -euo pipefail
 
 SELF="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 set -euo pipefail
 
 # nota: analiza archivos PDF con collision blocks

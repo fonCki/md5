@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 # clean out/ dir but keep .gitkeep
 # Usage: ./clean.sh [--out-dir PATH] [--dry-run]
 set -euo pipefail

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 # clean out/ directory keeping .gitkeep
 set -euo pipefail
 

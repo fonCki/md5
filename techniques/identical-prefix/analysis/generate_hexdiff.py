@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Author: Alfonso Pedro Ridao (s243942)
+# 02232 Applied Cryptography - Fall 2025
 """
 Generate side-by-side hexdump comparison
 Shows hex bytes, ASCII, and diff markers

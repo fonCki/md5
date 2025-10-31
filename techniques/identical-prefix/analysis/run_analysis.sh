@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Author: Alfonso Pedro Ridao (s243942)
 set -euo pipefail
 
 # nota: este script llama al analizador python

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Author: Alfonso Pedro Ridao (s243942)
+# 02232 Applied Cryptography - Fall 2025
 """
 reusable collision analyzer - jpeg/pdf/gzip
 
