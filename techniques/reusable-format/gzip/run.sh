@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Reusable format MD5 collision demo (GZIP .tar.gz)
-# Contract: run with --out-dir <PATH> and produce:
-#   <PATH>/collision1.tar.gz, <PATH>/collision2.tar.gz, <PATH>/manifest.json
-# (manifest lists the two real artifacts; no t1.bin/t2.bin anymore)
 set -euo pipefail
 
-# ---- parse args -------------------------------------------------------------
+# parse args
 OUT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -14,6 +10,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "${OUT}" ]] || { echo "missing --out-dir"; exit 2; }
+
 
 # ---- resolve paths ----------------------------------------------------------
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,9 +34,9 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
 else
   BOLD=""; DIM=""; RED=""; GREEN=""; YELLOW=""; BLUE=""; RESET=""
 fi
-ok()   { printf "%b✓%b %s\n" "$GREEN" "$RESET" "$1"; }
-warn() { printf "%b•%b %s\n" "$YELLOW" "$RESET" "$1"; }
-bad()  { printf "%b✗%b %s\n" "$RED" "$RESET" "$1"; }
+ok(){ printf "%b✓%b %s\n" "$GREEN" "$RESET" "$1"; }
+warn(){ printf "%b•%b %s\n" "$YELLOW" "$RESET" "$1"; }
+bad(){ printf "%b✗%b %s\n" "$RED" "$RESET" "$1"; }
 
 # ---- prepare out dir --------------------------------------------------------
 mkdir -p "${OUT}"
@@ -52,6 +49,7 @@ WORKDIR="$(mktemp -d)"
 cleanup() { rm -rf "${WORKDIR}"; }
 trap cleanup EXIT
 
+# nota: generar los tarballs base con GZIP=-n para reproducibilidad
 # ---- step 1: create payload tarballs ---------------------------------------
 tar -C "${ASSETS_DIR}/benign"    -cf "${WORKDIR}/A.tar" treeA
 tar -C "${ASSETS_DIR}/malicious" -cf "${WORKDIR}/B.tar" treeB
@@ -75,6 +73,7 @@ cp "${WORKDIR}/coll-2.gz" "${OUT}/collision2.tar.gz"
 MD5_LINE="$(md5sum    "${OUT}/collision1.tar.gz" "${OUT}/collision2.tar.gz")"
 SHA_LINE="$(sha256sum "${OUT}/collision1.tar.gz" "${OUT}/collision2.tar.gz")"
 
+# TODO revisar si gzip -t funciona en macOS
 gzip -t "${OUT}/collision1.tar.gz" && I1="OK" || I1="FAIL"
 gzip -t "${OUT}/collision2.tar.gz" && I2="OK" || I2="FAIL"
 

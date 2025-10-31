@@ -1,18 +1,19 @@
-SHELL := /bin/bash
+SHELL:=/bin/bash
 
 .PHONY: default ubuntu-first-run deps-ubuntu all list run analysis verify clean help
-.DEFAULT_GOAL := default
+.DEFAULT_GOAL:= default
 
-# Discover technique runners like techniques/<name>/run.sh (and one level deeper)
-RUNNERS := $(shell find techniques -mindepth 2 -maxdepth 3 -type f -name run.sh | sort)
+# discover technique runners (and one level deeper)
+RUNNERS:=$(shell find techniques -mindepth 2 -maxdepth 3 -type f -name run.sh | sort)
 
-# -------- Default: deps (Ubuntu/Debian) → build everything --------
+# default: deps (Ubuntu/Debian) → build everything
 default: ubuntu-first-run
 
 ubuntu-first-run: deps-ubuntu all
 	@echo "[done] First run complete."
 
-# -------- Dependency setup for Ubuntu/Debian --------
+
+# nota: deps solo funciona en Ubuntu/Debian
 deps-ubuntu:
 	@command -v apt >/dev/null 2>&1 || { echo "[deps-ubuntu] apt not found; skipping (non-Ubuntu/Debian)."; exit 0; }
 	@echo "[deps-ubuntu] Installing build deps (sudo may prompt)..."
@@ -20,10 +21,10 @@ deps-ubuntu:
 	sudo apt install -y build-essential autoconf automake libtool pkg-config m4 \
 	                    zlib1g-dev libbz2-dev git git-lfs libboost-all-dev \
 	                    curl wget ca-certificates
-	@# Ensure git-lfs hooks are installed (if any LFS objects exist)
+	@# ensure git-lfs hooks are installed (if any LFS objects exist)
 	git lfs install || true
 
-# -------- Build all techniques --------
+# run all techniques
 all:
 	@set -e; \
 	if [[ -z "$(RUNNERS)" ]]; then \
@@ -36,12 +37,12 @@ all:
 	  bash "$$r" --out-dir "$$d/out"; \
 	done
 
-# -------- Utility targets --------
+# list discovered techniques
 list:
 	@printf "Discovered run.sh files:\n"; \
 	for r in $(RUNNERS); do echo "  $$r"; done
 
-# Usage: make run TECH=identical-prefix
+# usage: make run TECH=identical-prefix
 run:
 	@if [[ -z "$(TECH)" ]]; then echo "Usage: make run TECH=identical-prefix"; exit 2; fi
 	@r="$$(find techniques -mindepth 1 -maxdepth 3 -type f -name run.sh -path "techniques/$(TECH)/*" -print -quit)"
@@ -67,7 +68,6 @@ analysis:
 verify:
 	@echo "==> Verifying"
 	@python3 tools/verify_all.py techniques/*/out/manifest.json techniques/*/*/out/manifest.json || true
-
 clean:
 	@bash scripts/clean.sh
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Native builder for HashClash md5 tools on macOS/Linux (no Docker).
-# Focuses on producing bin/md5_fastcoll and bin/md5_textcoll.
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. && pwd)"
@@ -15,7 +13,7 @@ rm -rf "${SRC}"
 echo "[*] Cloning HashClash into ${SRC} ..."
 git clone --depth=1 https://github.com/cr-marcstevens/hashclash "${SRC}"
 
-# CPU count
+# cpu count
 if command -v nproc >/dev/null 2>&1; then
   NJOBS="$(nproc)"
 elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -24,7 +22,8 @@ else
   NJOBS=2
 fi
 
-# Toolchain hints
+
+# toolchain hints
 if [[ "$(uname -s)" == "Darwin" ]]; then
   export CC="${CC:-clang}"
   export CXX="${CXX:-clang++}"
@@ -33,8 +32,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   fi
 fi
 
-# Critical flags: silence Boost/MPL enum constexpr warnings on recent Clang.
-# (This was the error you hit: -Wenum-constexpr-conversion)
+#: estas flags son criticas para compilar en Clang moderno
 CXXFLAGS_COMMON="-O3 -std=c++11 -DNDEBUG -Wno-enum-constexpr-conversion -Wno-deprecated-declarations -Wno-deprecated"
 export CXXFLAGS="${CXXFLAGS_COMMON}"
 
@@ -44,7 +42,8 @@ echo "[*] Bootstrapping autotools ..."
   autoreconf --install
 )
 
-# Ensure a local Boost if the tree expects it (preferred path used by HashClash)
+# ensure a local Boost if the tree expects it (preferred path used by HashClash)
+# TODO revisar si podemos usar boost del sistema en lugar de compilar desde cero
 if [[ ! -d "${SRC}/boost-1.72.0" ]]; then
   echo "[*] Building local Boost (1.72.0) — first time only ..."
   (

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Reusable format MD5 collision demo (JPEG, arbitrary inputs + payload blocks)
-# Produces: <OUT>/collision1.jpg, <OUT>/collision2.jpg, <OUT>/manifest.json
 set -euo pipefail
 
 # ---- parse args -------------------------------------------------------------
@@ -13,6 +11,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "${OUT}" ]] || { echo "missing --out-dir"; exit 2; }
 
+
 # ---- resolve paths ----------------------------------------------------------
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SELF_DIR="${SCRIPT_DIR}"
@@ -22,22 +21,25 @@ PAY_DIR="${SRC_DIR}/assets/payloads"
 
 # ---- tiny utilities ---------------------------------------------------------
 has() { command -v "$1" >/dev/null 2>&1; }
-need() { has "$1" || { echo "missing dependency: $1"; exit 3; }; }
+need(){ has "$1" || { echo "missing dependency: $1"; exit 3; }; }
 
-# Cross-platform hash helpers (GNU or macOS)
-hash_md5() {
+# cross-platform hash helpers (GNU or macOS)
+# nota: verificar en linux y mac
+hash_md5(){
   if   has md5sum; then md5sum "$@"
   elif has md5;    then md5 -r "$@"
   else echo "missing md5sum/md5"; exit 3; fi
 }
-hash_sha256() {
+
+hash_sha256(){
   if   has sha256sum; then sha256sum "$@"
   elif has shasum;    then shasum -a 256 "$@"
   else echo "missing sha256sum/shasum"; exit 3; fi
 }
 
-# Attempt to install jpegtran if missing (Ubuntu apt or macOS Homebrew)
-ensure_jpegtran() {
+# attempt to install jpegtran if missing (ubuntu apt or macOS Homebrew)
+# TODO revisar si funciona en todas las distros
+ensure_jpegtran(){
   if has jpegtran; then return 0; fi
   echo "jpegtran not found — attempting installation..."
   if has apt-get; then
@@ -66,8 +68,9 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
 else
   BOLD=""; DIM=""; RED=""; GREEN=""; YELLOW=""; BLUE=""; RESET=""
 fi
+
 ok()   { printf "%b✓%b %s\n" "$GREEN" "$RESET" "$1"; }
-bad()  { printf "%b✗%b %s\n" "$RED" "$RESET" "$1"; }
+bad(){ printf "%b✗%b %s\n" "$RED" "$RESET" "$1"; }
 warn() { printf "%b•%b %s\n" "$YELLOW" "$RESET" "$1"; }
 
 # ---- sanity checks (auto-bootstrap jpegtran) --------------------------------
@@ -86,13 +89,15 @@ rm -f "${OUT}/manifest.json" "${OUT}/collision1.jpg" "${OUT}/collision2.jpg"
 : > "${OUT}/verification.txt"
 
 WORKDIR="$(mktemp -d)"
-cleanup() { rm -rf "${WORKDIR}"; }
+cleanup(){ rm -rf "${WORKDIR}"; }
 trap cleanup EXIT
 
 # ---- stage inputs & preprocess to progressive scans -------------------------
+# nota: copiar imgs originales primero
 cp "${IN_DIR}/messi.jpg"   "${WORKDIR}/a.jpg"
 cp "${IN_DIR}/ronaldo.jpg" "${WORKDIR}/b.jpg"
 
+# convert to progressive scan (required for collision insertion)
 jpegtran -copy all -optimize -progressive "${WORKDIR}/a.jpg" > "${WORKDIR}/a_prog.jpg"
 jpegtran -copy all -optimize -progressive "${WORKDIR}/b.jpg" > "${WORKDIR}/b_prog.jpg"
 
@@ -121,6 +126,7 @@ fi
 cp "${WORKDIR}/${O1}" "${OUT}/collision1.jpg"
 cp "${WORKDIR}/${O2}" "${OUT}/collision2.jpg"
 
+# calc hashes
 MD5_LINE="$(hash_md5     "${OUT}/collision1.jpg" "${OUT}/collision2.jpg")"
 SHA_LINE="$(hash_sha256  "${OUT}/collision1.jpg" "${OUT}/collision2.jpg")"
 S1=$(wc -c < "${OUT}/collision1.jpg")

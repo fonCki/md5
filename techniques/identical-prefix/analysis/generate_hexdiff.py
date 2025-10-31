@@ -1,34 +1,32 @@
 #!/usr/bin/env python3
 """
-Generate a side-by-side hexdump comparison showing:
-- Hex bytes on the left
-- ASCII representation on the right
-- Difference markers showing where files differ
+Generate side-by-side hexdump comparison
+Shows hex bytes, ASCII, and diff markers
 """
 
 import sys
 
 def hexdump_line(data, offset, other_data=None):
-    """Generate one line of hexdump with optional diff markers"""
-    hex_parts = []
+    """one line of hexdump with optional diff markers"""
+    hex_parts=[]
     ascii_parts = []
-    diff_markers = []
+    diff_markers=[]
 
     for i in range(16):
-        idx = offset + i
-        if idx < len(data):
-            byte = data[idx]
+        idx=offset + i
+        if idx<len(data):
+            byte=data[idx]
             hex_parts.append(f"{byte:02X}")
 
-            # ASCII representation
-            if 32 <= byte <= 126:
+            # ascii repr
+            if 32<=byte<=126:
                 ascii_parts.append(chr(byte))
             else:
                 ascii_parts.append('.')
 
-            # Diff marker
-            if other_data and idx < len(other_data):
-                if byte != other_data[idx]:
+            # diff marker
+            if other_data and idx<len(other_data):
+                if byte!=other_data[idx]:
                     diff_markers.append('X')
                 else:
                     diff_markers.append('.')
@@ -39,23 +37,24 @@ def hexdump_line(data, offset, other_data=None):
             ascii_parts.append(" ")
             diff_markers.append(" ")
 
-    # Format: offset: hex1 hex2 ... hex8  hex9 ... hex16  |ascii|  diff
-    hex_left = " ".join(hex_parts[0:8])
+    # format: offset: hex1..hex8  hex9..hex16  |ascii|  diff
+    hex_left=" ".join(hex_parts[0:8])
     hex_right = " ".join(hex_parts[8:16])
-    ascii_str = "".join(ascii_parts)
+    ascii_str="".join(ascii_parts)
     diff_str = "".join(diff_markers)
 
     return f"{offset:02X}: {hex_left}  {hex_right}  {ascii_str}  {diff_str}"
 
-def generate_comparison(file1_path, file2_path, max_bytes=384):
-    """Generate side-by-side hexdump comparison"""
-    with open(file1_path, 'rb') as f1:
-        data1 = f1.read(max_bytes)
+
+def generate_comparison(file1_path,file2_path, max_bytes=384):
+    """generate side-by-side hexdump comparison"""
+    with open(file1_path,'rb') as f1:
+        data1=f1.read(max_bytes)
 
     with open(file2_path, 'rb') as f2:
-        data2 = f2.read(max_bytes)
+        data2=f2.read(max_bytes)
 
-    lines = []
+    lines=[]
     lines.append("## Visual Hexdump Comparison")
     lines.append("")
     lines.append("Side-by-side comparison showing the collision structure:")
@@ -65,26 +64,26 @@ def generate_comparison(file1_path, file2_path, max_bytes=384):
     lines.append("")
     lines.append("=== result_A.txt ===")
 
-    # First file
-    for offset in range(0, min(len(data1), max_bytes), 16):
-        lines.append(hexdump_line(data1, offset, data2))
+    # first file
+    for offset in range(0, min(len(data1),max_bytes), 16):
+        lines.append(hexdump_line(data1,offset,data2))
 
     lines.append("")
     lines.append("=== result_B.txt ===")
 
-    # Second file with diff markers
-    for offset in range(0, min(len(data2), max_bytes), 16):
+    # second file with diff markers
+    for offset in range(0,min(len(data2), max_bytes),16):
         lines.append(hexdump_line(data2, offset, data1))
 
     lines.append("```")
     lines.append("")
 
-    # Add structure breakdown
+    # structure breakdown
     lines.append("### Structure Breakdown")
     lines.append("")
     lines.append("```")
     lines.append("Bytes 0x00-0x3F (0-63):   PREFIX (readable text + padding)")
-    lines.append("  0x00-0x20: \"02232_Applied_Cryptography_Fall_2025\"")
+    lines.append('  0x00-0x20: "02232_Applied_Cryptography_Fall_2025"')
     lines.append("  0x21-0x3F: Null padding to 64-byte boundary")
     lines.append("")
     lines.append("Bytes 0x40-0xBF (64-191): COLLISION BLOCK (128 bytes)")
@@ -93,17 +92,17 @@ def generate_comparison(file1_path, file2_path, max_bytes=384):
     lines.append("  Differences at: 0x53, 0x6D, 0x6E, 0x7B, 0x93, 0xAD, 0xAE, 0xBB")
     lines.append("")
     lines.append("Bytes 0xC0-EOF (192-361):  IDENTICAL SUFFIX (169 bytes)")
-    lines.append("  \"--- Appendix (readable) ---\"")
-    lines.append("  \"Course: 02232 Applied Cryptography (Fall 2025)\"")
-    lines.append("  \"Note: Appending the SAME bytes to both files preserves...\"")
+    lines.append('  "--- Appendix (readable) ---"')
+    lines.append('  "Course: 02232 Applied Cryptography (Fall 2025)"')
+    lines.append('  "Note: Appending the SAME bytes to both files preserves..."')
     lines.append("```")
 
     return "\n".join(lines)
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
+if __name__=="__main__":
+    if len(sys.argv)!=3:
         print("Usage: generate_hexdiff.py <file1> <file2>")
         sys.exit(1)
 
-    output = generate_comparison(sys.argv[1], sys.argv[2])
+    output=generate_comparison(sys.argv[1],sys.argv[2])
     print(output)

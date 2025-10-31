@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Clean this technique's out/ directory while keeping (or recreating) .gitkeep.
-# Usage: ./clean.sh [--out-dir PATH] [--dry-run]
+# clean out/ directory keeping .gitkeep
 set -euo pipefail
 
 OUT=""
@@ -13,12 +12,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Default OUT to ./out next to this script
+# default to ./out next to this script
 SELF_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 [[ -n "${OUT}" ]] || OUT="${SELF_DIR}/out"
 mkdir -p "${OUT}"
 
-# Guard rails: refuse to clean outside this technique directory
+
 case "${OUT}" in
   "${SELF_DIR}"| "${SELF_DIR}/"* ) : ;;
   * ) echo "Refusing to clean outside technique dir: ${OUT}" >&2; exit 3;;
@@ -28,7 +27,7 @@ KEEP="${OUT}/.gitkeep"
 TMP_KEEP="$(mktemp -t keep.XXXXXX || true)"
 [[ -f "${KEEP}" ]] && cp -f "${KEEP}" "${TMP_KEEP}" || true
 
-# Remove everything except .gitkeep (portable: glob + filter)
+# remove everything except .gitkeep (glob + filter)
 shopt -s dotglob nullglob
 TO_DELETE=("${OUT}"/*)
 PRUNED=()
@@ -46,7 +45,7 @@ if (( ${#PRUNED[@]} )); then
   fi
 fi
 
-# Restore or recreate .gitkeep
+# restore or create .gitkeep
 if [[ -f "${TMP_KEEP}" ]]; then
   mv -f "${TMP_KEEP}" "${KEEP}" || :
 else

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clean all techniques' out/ directories while preserving .gitkeep
+# clean all out/ dirs but keep .gitkeep
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. && pwd)"
@@ -12,13 +12,14 @@ run_local_clean() {
   [[ -d "${out_dir}" ]] || return 0
 
   if [[ -x "${tech_dir}/clean.sh" ]]; then
+    # use tech's own clean script if available
     if (( DRY )); then
       "${tech_dir}/clean.sh" --out-dir "${out_dir}" --dry-run
     else
       "${tech_dir}/clean.sh" --out-dir "${out_dir}"
     fi
   else
-    # Fallback: generic clean for this out/
+    # fallback: generic clean
     local keep="${out_dir}/.gitkeep"
     local tmp_keep; tmp_keep="$(mktemp -t keep.XXXXXX || true)"
     [[ -f "${keep}" ]] && cp -f "${keep}" "${tmp_keep}" || true
@@ -38,12 +39,13 @@ run_local_clean() {
         rm -rf -- "${PRUNED[@]}"
       fi
     fi
+    # restore .gitkeep
     if [[ -f "${tmp_keep}" ]]; then mv -f "${tmp_keep}" "${keep}" || : ; else : > "${keep}"; fi
     (( DRY )) && echo "DRY RUN complete for ${out_dir}" || echo "Cleaned ${out_dir}"
   fi
 }
 
-# Scan techniques at depth 2 and 3 (mirrors Makefile discovery)
+# scan techniques at depth 2 and 3 (same as Makefile)
 for d in "${ROOT}"/techniques/* "${ROOT}"/techniques/*/*; do
   [[ -d "$d" ]] || continue
   run_local_clean "$d"

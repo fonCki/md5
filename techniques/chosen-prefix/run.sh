@@ -7,22 +7,25 @@ while [[ $# -gt 0 ]]; do
     --out-dir) OUT="$2"; shift 2;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
-
 done
 [[ -n "$OUT" ]] || { echo "missing --out-dir"; exit 2; }
+
+
 mkdir -p "$OUT"
 
-# Centralize artifact paths
+# artifact paths
 T1="$OUT/t1.bin"
 T2="$OUT/t2.bin"
 MANIFEST="$OUT/manifest.json"
 readonly OUT T1 T2 MANIFEST
 
-# TODO: replace this stub with your real generator
+# TODO: replace stub with real CPC generator
+# nota: implementar HashClash chosen-prefix cuando este listo
 echo "stub-A" > "$T1"
 echo "stub-B" > "$T2"
 
-# Manifest
+
+# gen manifest
 cat > "$MANIFEST" <<JSON
 {
   "technique": "chosen-prefix",
@@ -32,5 +35,5 @@ cat > "$MANIFEST" <<JSON
 }
 JSON
 
-# Also print manifest to stdout
+# print to stdout
 cat "$MANIFEST"
