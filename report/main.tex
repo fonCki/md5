@@ -10,7 +10,6 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{adjustbox}
-% nota: colores para los bloques de codigo
 \definecolor{codebg}{RGB}{248,248,248}
 \definecolor{codeframe}{RGB}{220,220,220}
 \definecolor{codegray}{gray}{0.45}
@@ -26,9 +25,9 @@
 }
 \lstdefinestyle{console}{style=code, language=bash}
 \lstdefinestyle{python}{style=code, language=Python}
-% hex/plain text dumps
+% Hex/“plain text” dumps
 \lstdefinestyle{textblock}{style=code, language={} }
-% inline highlighting with @...@
+% Allow simple inline highlighting with @...@
 \lstdefinestyle{hexhi}{
     style=textblock,
     moredelim=**[is][\bfseries\color{red}]{@}{@}
@@ -47,19 +46,20 @@
     basicstyle=\ttfamily\footnotesize,
     columns=fullflexible,
     keepspaces=true,
-    breaklines=true,
+    breaklines=true,   % was false
     numbers=none,
     frame=single,
 }
 
+
 \lstdefinestyle{hexhi}{%
-    basicstyle=\ttfamily\scriptsize,
+    basicstyle=\ttfamily\scriptsize,   % smaller than footnotesize
     columns=fullflexible,
     keepspaces=true,
-    breaklines=false,
-    numbers=none,
+    breaklines=false,                  % never wrap hex lines
+    numbers=none,                      % save horizontal space
     frame=single,
-% highlight @..@ spans
+% highlight @..@ spans:
     literate={@}{}1
         {@00@}{{\bfseries\color{red}00}}3
         {@01@}{{\bfseries\color{red}01}}3
@@ -70,14 +70,14 @@
 
 \usepackage{url}
 \usepackage{hyperref}
-\usepackage{pdfpages}
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
     filecolor=magenta,
     urlcolor=cyan,
 }
-\def\UrlBreaks{\do\/\do-}
+
+\def\UrlBreaks{\do\/\do-} % Helps break long URLs in the bibliography
 
 \begin{document}
 
@@ -90,32 +90,33 @@
     \maketitle
 
     \begin{abstract}
-        This report examines vulnerabilities in cryptographic hash functions, with a specific focus on the MD5 algorithm. We explain the theory behind collision attacks, show their practical security threats using real-world examples, and classify different types of related attacks. This background information is used to support a series of hands-on experiments that demonstrate identical-prefix, chosen-prefix, and reusable collision attacks.
+        This report demonstrates MD5's broken collision resistance through practical attacks using the HashClash toolkit. Three techniques were implemented: identical-prefix collisions that generate files differing in a small collision block while preserving the hash after appending identical suffixes, chosen-prefix collisions that produce different binary prefixes with matching MD5 digests, and reusable collisions that embed pre-computed blocks into JPEG, PDF, and GZIP files to create visually distinct content with identical hashes. The experiments also explored collision attacks on X.509 certificate signing requests to test real-world applicability. All collision pairs were verified by confirming MD5 matches alongside SHA-256 differences, demonstrating that MD5 should no longer be used for security-critical applications.
         \keywords{MD5 \and Hash Collision \and Cryptanalysis \and Data Integrity}
     \end{abstract}
 
     \section{Introduction: Cryptographic Hashes and Collision Attacks}
 
-    A cryptographic hash function is an algorithm that takes an input of any size and produces a fixed-size output. This output is usually called a digest or a hash value. The digest works like a unique "fingerprint" for the original data. If any part of the input is changed, even just a single bit, the hash output should change completely. This is known as the \textbf{avalanche effect}.
+    MD5 was designed by Ronald Rivest in 1992 as a fast 128-bit cryptographic hash function intended for digital signatures and file integrity verification (Rivest, 1992). Like other Merkle-Damgård constructions, MD5 takes arbitrary-length input and produces a fixed-size digest through iterative compression. The function was built around two core security properties: preimage resistance (one-wayness) and collision resistance (NIST NVD, 2009).
 
-    Hash functions are designed to have two main security properties. They are one-way, which means it is not practical to figure out the original input from its hash. They are also collision-resistant, meaning it is extremely difficult to find two different inputs that create the same hash (NIST NVD, 2009). These properties are essential for protecting data integrity. For example, the \textbf{MD5 algorithm} was created to be a secure tool for digital signatures and for verifying that files have not been altered (Rivest, 1992).
+    Collision resistance is particularly critical because it prevents attackers from creating two different inputs that hash to the same value. While collisions must exist mathematically due to the pigeonhole principle, a secure hash function should make finding them computationally infeasible. For a 128-bit function like MD5, the birthday paradox suggests that a brute-force collision search requires roughly $2^{64}$ operations.
 
-    The security of a hash function fully depends on its collision resistance. According to a mathematical concept called the pigeonhole principle, collisions must exist. However, a secure hash function makes the work of finding a collision practically impossible. For a perfect hash with an n-bit output, a brute-force search for a collision would require about $2^{n/2}$ operations. This estimate comes from the \textbf{birthday paradox}. For a 128-bit hash like MD5, this would be $2^{64}$ operations.
+    MD5 failed to meet this security bar. Theoretical weaknesses emerged in the 1990s, and by 2004, practical collision attacks had been demonstrated. The situation deteriorated rapidly - by 2006, researchers could generate MD5 collisions in under a minute on consumer hardware (Klima, 2006). This catastrophic breakdown made MD5 unsuitable for any security-critical application.
 
-    Unfortunately, major weaknesses were found in MD5’s design. These flaws allowed cryptanalysts to find collisions much more easily. By 2006, the attacks had become so advanced that an MD5 collision could be generated in under a minute on a regular laptop computer (Klima, 2006).
+    This report demonstrates three practical collision techniques we implemented: identical-prefix collisions using HashClash, chosen-prefix collisions applied to X.509 certificate requests, and reusable collisions embedded in JPEG, PDF, and GZIP file formats. We verify each collision by confirming that colliding files share identical MD5 hashes while producing different SHA-256 digests.
+
 
 
     \section{The Security Threat of MD5 Collisions}
 
-    In cryptography, a collision attack is a method for finding two different inputs, M and M’, that produce the exact same hash output, so that $H(M) = H(M')$, even though $M \neq M'$ (Leurent and Peyrin, 2020).
+    In cryptography, a collision attack finds two distinct inputs, M and M', that produce identical hash outputs: $H(M) = H(M')$ despite $M \neq M'$ (Leurent and Peyrin, 2020).
 
-    The ability to intentionally create hash collisions is a serious security threat. If an attacker can make two different files with the same hash, they can trick systems that use hashes to verify trust. The classic example is a digital signature. A signature is created validating the hash of a document, not the actual document itself. An attacker can create a harmless document (A) and a malicious document (B) that both share the same hash. The attacker then gets the harmless document A officially signed. Because the signature is just for the hash, they can take that signature and attach it to the malicious document B. The signature will appear valid because the hash it belongs to has not changed (Stevens, Lenstra and de Weger, 2012; \cite{microsoft}).
+    When an attacker can deliberately generate hash collisions, systems relying on hashes for authenticity verification become vulnerable. Consider digital signatures, which validate the hash of a document rather than the document itself. An attacker could prepare two documents -a benign one (A) and a malicious one (B) -engineered to share the same hash value. After obtaining an official signature on document A, the attacker can transfer that signature to document B. The signature remains valid because it corresponds to the hash, which has not changed between the two documents (Stevens, Lenstra and de Weger, 2012; Microsoft, 2008).
 
-    This is not just a theoretical problem. There are real-world examples. Researchers created two different X.509 SSL certificates that had the same MD5 hash. One was for a legitimate website, but the other was for a fake Certificate Authority (CA). Because the hashes matched, the fake certificate could be trusted (Stevens et al., 2009; \cite{microsoft}). Additionally, the "Flame" malware found in 2012 used a new type of chosen-prefix collision attack. This attack allowed it to fake a Microsoft code-signing certificate, which made its malicious code look like authentic software from Microsoft (Fillinger and Stevens, 2015).
+    Real-world exploits demonstrate this vulnerability. Researchers generated two distinct X.509 SSL certificates with identical MD5 hashes -one legitimate and one posing as a Certificate Authority (CA). The hash collision allowed the fraudulent CA certificate to pass verification (Stevens et al., 2009; Microsoft, 2008). The 2012 "Flame" malware went further by exploiting a chosen-prefix collision to forge a Microsoft code-signing certificate, making its payload appear as legitimate Microsoft software (Fillinger and Stevens, 2015).
 
-    These incidents show that once a hash function's collision resistance is broken, it must be considered unsafe and should no longer be used for security purposes (\cite{microsoft}).
+    Once collision resistance fails, a hash function becomes cryptographically broken and unsuitable for security applications (Microsoft, 2008).
 
-    \paragraph{Threat Model and Realistic Scenario.}
+    \paragraph{Threat Model and Realisitic Scenario.}
     \textbf{Adversary.} An external attacker can generate MD5 identical- or chosen-prefix collisions offline and can submit benign-looking content to be signed, whitelisted, or distributed. The attacker cannot break public-key signatures or tamper with servers after publication. \textbf{Targets.} (i) Enterprise email gateways and DLP systems that trust MD5 for attachment de-duplication or policy decisions; (ii) software allow-lists and vendor update feeds that identify binaries by MD5; (iii) document workflows where the signature or approval is bound to an MD5 of a PDF rather than to a canonicalized document object.
 
     \textbf{Scenario.} The attacker crafts two files with the \emph{same} MD5: a benign “cover” object that is submitted for approval/signing/allow-listing, and a malicious counterpart. In a chosen-prefix setting, two different preambles (e.g., invoice vs.\ wire-instruction PDF headers or two DER-encoded CSRs) are linked with tailored suffixes so their full-file MD5 digests collide. In a reusable-collision setting, a short collided prefix plus a large identical suffix yields two files that render or unpack \emph{different} content while hashing identically. After the benign object is approved (signature attached, hash added to an allow-list, or update feed published), the attacker substitutes the malicious twin: verification that relies on MD5 alone accepts it as legitimate, enabling document fraud, policy bypass, or malicious code distribution.
@@ -125,21 +126,23 @@
 
     \section{A Taxonomy of Collision and Related Attacks}
 
-    The following is a brief overview of different attack types relevant to hash functions. Our experiments will focus on the first three.
+    Below is a taxonomy of attack types on hash functions. The first three are demonstrated experimentally in Section~4.
+
     \begin{enumerate}
-        \item \textbf{Identical-Prefix Collision:} Two messages share a common starting prefix (P) but have different suffixes (X and Y) that are specially crafted to produce a collision: H(P$||$X) = H(P$||$Y).
-        \item \textbf{Chosen-Prefix Collision:} A more powerful attack where an adversary chooses two \textit{different} prefixes (P and P') and computes suffixes (S and S') to make them collide: H(P$||$S) = H(P'$||$S') (Stevens, Lenstra \& de Weger, 2012; Leurent and Peyrin, 2020).
-        \item \textbf{Reusable Collisions \& Format Tricks:} The practical application of the above techniques. A colliding block pair is pre-computed and then embedded within the flexible structure of file formats (Albertini, n.d.).
+        \item \textbf{Identical-Prefix Collision} (see Section~4.1).
+        \item \textbf{Chosen-Prefix Collision} (see Section~4.2).
+        \item \textbf{Reusable Collisions \& Format Tricks} (see Section~4.3).
         \item \textbf{Preimage Attack:} Given a hash output H, find any input M such that H(M) = H.
-        \item \textbf{Second-Preimage Attack:} Given an input M, find a different input M' such that H(M) = H(M') (Kelsey and Schneier, 2005).
-        \item \textbf{Multicollisions:} Techniques to find a large set of colliding messages, not just a pair, with minimal extra work (Joux, 2004).
-        \item \textbf{Herding / Nostradamus Attack:} Commit to a hash now and later "herd" any message to match it.
-        \item \textbf{Near-Collisions:} Find inputs whose hashes differ by only a few bits.
-        \item \textbf{Length-Extension Attack:} A weakness in the Merkle–Damgård construction that allows an attacker to compute H(M$||$X) from H(M) without knowing M.
+        \item \textbf{Second-Preimage Attack:} Given an input M, find a different input M' where H(M) = H(M') (Kelsey and Schneier, 2005).
+        \item \textbf{Multicollisions:} Finding a large set of colliding messages beyond just a pair (Joux, 2004).
+        \item \textbf{Herding / Nostradamus Attack:} Commit to a hash value in advance, then construct a message that matches it later.
+        \item \textbf{Near-Collisions:} Inputs whose hash outputs differ by only a few bits.
+        \item \textbf{Length-Extension Attack:} A property of Merkle–Damgård construction allowing computation of H(M$||$X) from H(M) without knowing M.
     \end{enumerate}
 
     \section{Experimental Results}
-    Our investigation focused on demonstrating the first three, and most practical, types of collision attacks against MD5. The following sections detail the methodology and outcomes of our experiments.
+    This research focuses on collision attacks against MD5 that are both practical and reproducible. The experiments demonstrate three main collision techniques, each chosen for its real-world relevance and feasibility of implementation.
+
 
     \subsection{Identical-Prefix Collisions}
 
@@ -249,6 +252,9 @@ SHA256 still differs:    True
     \]
     Compared with identical-prefix collisions, CPCs are strictly more powerful because the attacker controls both preambles (for example, two different certificate requests or document headers). CPCs therefore directly enable practical attacks against systems that sign or otherwise trust hashes computed over full files.
 
+% Maybe adding about the fact that the preamble can be long too?
+% Defining what long means?
+
     \paragraph{High-level approach.}
     Our CPC experiments use the HashClash toolkit. The solver combines two phases: (1) a near-collision/differential search (a birthday-style phase) that finds internal state collisions, and (2) message modification that enforces a chosen differential path while maintaining the collision. During message modification the solver explores many local choices (“tunnels”) and backtracks when constraints fail; this greatly improves practical success rates.
 
@@ -256,7 +262,7 @@ SHA256 still differs:    True
     Many systems sign or whitelist the \emph{hash} of a payload rather than the payload itself. With a CPC, an attacker can produce two semantically different files that collide under MD5: the benign one is accepted (or signed), while the malicious one inherits the same hash, subverting integrity checks.
 
     \paragraph{What the solver is doing (intuition).}
-    MD5 absorbs 512-bit blocks through a 64-step compression. HashClash constructs a differential path so the two message expansions (after \(P\) and \(P'\)) evolve with controlled bit-differences and eventually re-converge. During message modification, multiple step-wise bit assignments may satisfy the path; these small local choice points are called \emph{tunnels}. If later constraints fail, the solver \emph{backtracks} to a recent tunnel and explores an alternate branch, improving practical success rate without restarting the whole pipeline.
+    MD5 absorbs 512-bit blocks through a 64-step compression. HashClash constructs a differential path so the two message expansions (after \(P\) and \(P'\)) evolve with controlled bit-differences and eventually re-converge. During message modification, multiple step-wise bit assignments may satisfy the path; these small local choice points are called \emph{tunnels}. If later constraints fail, the solver \emph{backtracks} to a recent tunnel and explores an alternate branch, improving the practical success rate without restarting the whole pipeline.
 
     For this method of attack only two experiments are provided: one on binary files that should be easy to understand and a harder one on a Certification Authority.
 
@@ -303,12 +309,23 @@ SHA256(prefixB.bin.coll)   d6f1...1f03
 
     We then attempted to sign only one of them with OpenSSL to test if the signature could be transferred to the twin file.
 
-    \paragraph{Result.} The collision was successful at the file level, but the signature could \emph{not} be transferred. OpenSSL computed signatures over the internal \texttt{CertificationRequestInfo} object—not the entire file—so appending collision blocks outside that region had no effect on the signed bytes (fig.~\ref{fig:x509-structure}). The two CSRs were structurally different where it mattered.
+    \paragraph{Result.} The collision was successful at the file level, but the signature could \emph{not} be transferred. The critical point is that X.509/PKCS\#10 signatures are computed over a precisely defined inner ASN.1 object, not over the entire file bytes (a visual representation can be seen in fig.~\ref{fig:x509-signing}). For a certificate the CA signs the \texttt{tbsCertificate} structure; for a certificate signing request the signer (typically the requestor) signs the \texttt{CertificationRequestInfo} object. Conforming parsers extract and verify the signature over that inner object only.
 
-    \paragraph{Key Insight.} The failure highlights a critical design property: signatures apply to structured data, not raw bytes. In ASN.1/DER encodings, data boundaries prevent trivial collision abuse. The original rogue CA attack succeeded only because it precisely aligned the collision blocks inside the signed region (\texttt{TBSCertificate}) via binary layout control—far beyond a naïve CSR attempt.
+    Thus, a whole-file MD5 collision created by appending bespoke blocks outside the signed region does \emph{not} give an identical signed TBS: the bytes the CA actually hashes and signs (the inner DER object) remain different between the two files unless the collision blocks are \emph{precisely} placed inside that inner, signed DER region. Our HashClash outputs collided the full files, but did not (and could not without deeper control of the DER layout) align the collision bytes exactly inside \texttt{CertificationRequestInfo}. OpenSSL therefore computed different inner hashes and rejected signature transposition.
 
-    \paragraph{Why DER (not BER/PEM).}
-    X.509 certificates and PKCS\#10 CSRs are ASN.1 structures. We use \emph{DER} (Distinguished Encoding Rules) because it is \textbf{canonical}: each abstract object has a single, deterministic byte encoding. Canonical encoding is essential for cryptanalysis experiments for two reasons. First, MD5 (like any Merkle–Damgård hash) operates on exact bytes; non-canonical encodings (e.g., BER) would admit multiple byte encodings for the same logical object, making results ambiguous. Second, in X.509/PKCS\#10, signatures cover the inner, well-delimited objects (\texttt{TBSCertificate} for certificates, \texttt{CertificationRequestInfo} for CSRs). Using DER ensures that the to-be-signed (TBS) region is byte-stable across toolchains and re-encoding, which is crucial when aligning a chosen-prefix collision to those boundaries.
+    \paragraph{What a real ``rogue CA'' style exploit requires.}
+    Reproducing the 2008–09 rogue-CA result requires far more than generating two whole-file collisions. In practice an adversary needs to:
+    \begin{enumerate}
+        \item Control the exact DER layout of the \texttt{tbsCertificate} (or \texttt{CertificationRequestInfo}) so that collision blocks land \emph{inside} the signed region without breaking DER length fields and structure.
+        \item Ensure the inner signing region in both variants is byte-for-byte colliding under MD5 (not merely the whole file).
+        \item Arrange for a CA (or the target signer) to sign one of those prepared TBS DER encodings while using MD5 as the hashing algorithm for the signature (historically possible under certain legacy toolchains).
+        \item Optionally reuse the same subject public key or otherwise control the fields the CA signs so that the signed public-key-related bytes are compatible with both variants.
+    \end{enumerate}
+    All of these steps demand fine-grained control of ASN.1 lengths, choices of algorithm OIDs and parameters, and—critically—the CA issuance process itself.
+
+    \paragraph{Practical takeaway for our experiment.}
+    Our experiment shows two things: (1) MD5 collisions for whole files are trivial to construct with current tooling for many formats; (2) exploiting such collisions against DER-signed artifacts requires in-depth ASN.1 layout control so the collision bytes are inside the TBS object. The original rogue-CA attack succeeded because the attackers \emph{constructed} two \texttt{TBSCertificate} DER encodings that collided and presented one to a CA in a context that produced an MD5-based signature. Naïve append-based CPC attempts against CSRs therefore fail under common toolchains.
+
 
     \begin{table}[h!]
         \centering
@@ -331,32 +348,6 @@ SHA256(prefixB.bin.coll)   d6f1...1f03
         \vspace{0.5em}
     \end{table}
 
-
-    \paragraph{Why it fails with real tooling.}
-    ASN.1/DER structures are \emph{self-delimiting} and X.509/PKCS\#10 signatures are computed over \emph{designated inner objects}, not over ``the entire file'':
-    \begin{itemize}
-        \item For CSRs (PKCS\#10), the signature covers the \texttt{CertificationRequestInfo} structure.
-        \item For certificates, the CA signs the \texttt{TBSCertificate} structure.
-    \end{itemize}
-    Any collision bytes appended \emph{after} these inner objects are outside the signed region and are ignored by conforming parsers. Thus, even if two whole-file MD5 hashes collide, the hash that \emph{actually gets signed} (MD5 of the inner DER object) will differ unless the CPC is aligned to—and preserves—the exact DER boundaries of the signed object. In our experiment we did not control those boundaries, so \texttt{openssl} correctly rejects the transposition, proving that thankfully a naïve CPC attempt on certificate requests fails under standard X.509 toolchain.
-
-    \paragraph{Security note.}
-    The 2008–2009 rogue-CA success \cite{stevens2009crypto} did \emph{align CPC precisely} to the DER of \texttt{TBSCertificate} and exploited MD5 in a targeted CA issuance process; reproducing that is far more intricate than a simple “append collision block” attempt.
-
-    \begin{figure}[h!]
-        \centering
-        \begin{lstlisting}[basicstyle=\ttfamily\small]
-Certificate ::= SEQUENCE {
-    tbsCertificate        -- signed region (DER, fixed length)
-    signatureAlgorithm
-    signatureValue
-}
-        \end{lstlisting}
-        \caption{Structure of an X.509 certificate. Only the \texttt{tbsCertificate} field is hashed and signed.}
-        \label{fig:x509-structure}
-    \end{figure}
-
-
     \subsection{Reusable Collisions via Formatting Tricks}
 
     \textbf{Reusable collisions} are a practical method that uses a short, pre-computed collision block. This block is placed at the beginning of a file, and a large, identical suffix is attached to the end. The two files created this way are different only in a few carefully chosen bytes inside that small prefix.
@@ -374,7 +365,7 @@ Certificate ::= SEQUENCE {
     Produce two JPEG files that (i) open to different photographs (Messi vs Ronaldo), (ii) have the same MD5, and (iii) different SHA-256.
 
     \paragraph{Methodology.}
-    We used \texttt{jpg.py} from Albertini (n.d.) with two inputs (\texttt{messi.jpg}, \texttt{ronaldo.jpg}). As in the toolkit, inputs are normalized to progressive JPEG. The script prepends a 74-byte collision prefix (two variants) and appends a shared JPEG suffix assembled from the normalized inputs. Only a couple of bytes differ inside the prefix; the rest of the file is identical.
+    We used \texttt{jpg.py} from Albertini (n.d.) with two inputs (\texttt{messi.jpg}, \texttt{ronaldo.jpg}). As in the toolkit, inputs are normalized to progressive JPEG (it has a different encoding). The script prepends a 74-byte collision prefix (two variants) and appends a shared JPEG suffix assembled from the normalized inputs. Only a couple of bytes differ inside the prefix; the rest of the file is identical.
 
     \paragraph{Results.}
     Files:
@@ -387,12 +378,12 @@ Certificate ::= SEQUENCE {
         \centering
         \begin{minipage}{0.48\textwidth}
             \centering
-            \includegraphics[width=\textwidth]{ronaldo.jpg}
+            \includegraphics[width=\textwidth]{ronaldo.jpg} % Make sure filename is correct
             \caption*{ronaldo.jpg (Ronaldo)}
         \end{minipage}\hfill
         \begin{minipage}{0.48\textwidth}
             \centering
-            \includegraphics[width=\textwidth]{messi.jpg}
+            \includegraphics[width=\textwidth]{messi.jpg} % Make sure filename is correct
             \caption*{messi.jpg (Messi)}
         \end{minipage}
         \caption{Reusable JPEG MD5 collision: two different pictures with the same MD5 digest.}
@@ -406,6 +397,7 @@ SHA256(c1) 22f2c829021e449455c27c15b28e7de8f1b24958606b39ca38af92429dc579ae
 SHA256(c2) ed7a6e4d870f4f0035f1f7ecd5112d1065b817ad66bf95635fc24d8b5df6e1be
     \end{lstlisting}
 
+% --- First difference & prefix flips -----------------------------------------
     \begin{lstlisting}[style=textblock,
         caption={First difference \& prefix flips},
         label={lst:firstdiff}]
@@ -417,6 +409,7 @@ diffs inside 0..73:
 
     Only two bytes differ in the 74-byte prefix; from byte~74~$\rightarrow$~EOF the files are identical.
 
+% --- Identical suffix ---------------------------------------------------------
     \begin{lstlisting}[style=textblock,
         caption={Identical suffix boundary \& length},
         label={lst:suffix}]
@@ -424,6 +417,7 @@ suffix starts at byte 74 (0x4A)
 identical tail length = 16087 bytes
     \end{lstlisting}
 
+% --- Steering flip (2nd COM length) ------------------------------------------
     \begin{lstlisting}[style=textblock,
         caption={Steering flip (2nd COM length) and next-marker offsets},
         label={lst:comlength}]
@@ -489,7 +483,13 @@ FNAME (c1/c2):  None / None
 00000040  08 04 41 6e 67 65 02 ff 76 @01@ 43 42 72 00 2a 2a  |..Ange..v.CBr.**|
     \end{lstlisting}
 
-    \textit{} A pair of single-bit flips occur inside the reusable prefix: at offset 0x49 (decimal 73) the byte changes \texttt{00$\rightarrow$01}, and at offset 0x89 (decimal 137) also changes. Because we use 0-based offsets, the identical suffix begins at byte 0x8A (decimal 138) = last flip + 1; from there to EOF the two files are byte-identical. Full per-format details are auto-generated in \texttt{techniques/reusable-format/gzip/out/analysis.md}.
+    \textit{} A pair of single-bit flips occur inside the reusable prefix: at offset
+    0x49 (decimal 73) the byte changes \texttt{00$\rightarrow$01}, and at
+    offset 0x89 (decimal 137) also changes. Because
+    we use 0-based offsets, the identical suffix begins at byte
+    0x8A (decimal 138) = last flip + 1; from there to EOF the two files are
+    byte-identical. Full per-format details (including the exact bytes) are
+    auto-generated in \texttt{techniques/reusable-format/gzip/out/analysis.md}.
 
     \subsubsection{PDF documents with different content}
 
@@ -525,7 +525,7 @@ identical tail length = 70496 bytes
 
 
     \paragraph{Reproducibility and artifacts.}
-    All three reusable-collision experiments (JPEG, GZIP, PDF) are reproducible from our repository; each \texttt{run.sh} produces a pair of collided files and an \texttt{analysis.md} with hashes, first-difference locations, identical-suffix boundaries, and format-specific notes. See the per-format \texttt{out/} folders for the analysis files.
+    All three reusable-collision experiments (JPEG, GZIP, PDF) are reproducible from our repository; each \texttt{run.sh} produces a pair of collided files and an \texttt{analysis.md} with hashes, first-difference locations, identical-suffix boundaries, and format-specific notes. See the per-format \texttt{out/} folders for \texttt{analysis.md} and header hex dumps (\texttt{c1.head.hex}, \texttt{c2.head.hex}).
 
     \subsubsection{Applicability to Different File Formats}
 
@@ -543,6 +543,13 @@ identical tail length = 70496 bytes
 
     \newpage
     \section{Appendix A: Images, Graphs and Diagrams}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=1\linewidth]{X509Signing.drawio.png}
+        \caption{Annotated X.509 signing flow. The CA computes \texttt{signatureValue} = Sign\_CA( MD5(tbsCertificate) ); note that \texttt{signatureAlgorithm} is stored \emph{outside} the tbsCertificate.}
+        \label{fig:x509-signing}
+    \end{figure}
 
     \subsection{Complete Hexdump Visualization: Identical-Prefix Collision}
 
